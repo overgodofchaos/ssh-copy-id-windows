@@ -115,3 +115,5 @@ def copy_id(host: str, username: str | None, port: int | None, id_path: str | No
 
     with ssh.sftp.open(f"{ssh.home}/.ssh/authorized_keys", "w") as f:
         f.write(new_authorized_keys.encode("utf-8"))
+
+    print("Success.")

@@ -1,2 +1,5 @@
 *temp*.py
 .idea
+ssh-copy-id.build
+ssh-copy-id.dist
+ssh-copy-id.onefile-build

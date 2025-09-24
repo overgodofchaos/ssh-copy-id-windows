@@ -1,7 +1,7 @@
 [project]
 name = "ssh-copy-id-windows"
-version = "1.0.0"
-description = ""
+version = "1.0.1"
+description = "ssh-copy-id for Windows OS."
 authors = [
     {name = "overgodofchaos",email = "vezonzzzzzz@gmail.com"}
 ]

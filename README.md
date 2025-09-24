@@ -2,6 +2,22 @@
 
 ---
 
+# Install
+
+---
+
+### With PyPi:
+```shell
+pip (or pipx) install ssh-copy-id-windows
+```
+
+### Manual:
+1. Download zip archive from `releases`.
+2. Unzip the archive to any directory.
+3. Install with `bat scripts` or manually add `bin` directory to `PATH`.
+
+
+
 # Usage
 
 ---

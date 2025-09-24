@@ -2,6 +2,10 @@
 
 ---
 
+ssh-copy-id for Windows OS.
+
+https://github.com/overgodofchaos/ssh-copy-id-windows
+
 # Install
 
 ---
@@ -12,7 +16,7 @@ pip (or pipx) install ssh-copy-id-windows
 ```
 
 ### Manual:
-1. Download zip archive from `releases`.
+1. Download zip archive from [releases](https://github.com/overgodofchaos/ssh-copy-id-windows/releases).
 2. Unzip the archive to any directory.
 3. Install with `bat scripts` or manually add `bin` directory to `PATH`.
 

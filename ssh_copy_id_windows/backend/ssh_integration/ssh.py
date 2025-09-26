@@ -1,13 +1,20 @@
+from dataclasses import dataclass
 from functools import cached_property, wraps
 from getpass import getpass
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import fabric
 import paramiko
 from loguru import logger
 
 log = logger.bind(name="ssh")
+
+
+@dataclass
+class System:
+    linux: bool = False
+    windows: bool = False
 
 
 class SSH:
@@ -20,9 +27,33 @@ class SSH:
         # self.sftp = paramiko.SFTPClient.from_transport(self.con.transport)
         self.sftp = self.con.sftp()
 
+
+
+    @cached_property
+    def system(self) -> System:
+        unix_test = self.run("uname -s", hide=True, warn=True)
+
+        if unix_test.ok:
+            if "linux" in unix_test.stdout.lower():
+                return System(linux=True)
+            else:
+                raise RuntimeError(f"Unsupported system: {unix_test.stdout}")
+        else:
+            windows_test = self.run("ver", hide=True, warn=True)
+            if windows_test.ok:
+                if "windows" in windows_test.stdout.lower():
+                    return System(windows=True)
+                else:
+                    raise RuntimeError(f"Unsupported system: {windows_test.stdout}")
+            else:
+                raise RuntimeError(f"Unknown system.")
+
     @cached_property
     def home(self) -> str:
-        return self.run("echo $HOME", hide=True).stdout.strip()
+        if self.system.linux:
+            return self.run("echo $HOME", hide=True).stdout.strip()
+        else:
+            return self.run(f"powershell -Command \"echo $HOME\"").stdout.strip()
 
     def resolve_path(self, path: str | Path) -> str:
         path = str(path)
@@ -65,14 +96,26 @@ class SSH:
     def check_exist_file(self, path: Path | str) -> bool:
         path = self.resolve_path(path)
 
-        result = self.run(rf'test -f "{path}"', warn=True, hide=True)
+        if self.system.linux:
+            result = self.run(rf'test -f "{path}"', warn=True, hide=True)
+        else:
+            result = self.run(
+                f"powershell -Command \"Test-Path '{path}' -PathType Leaf\"",
+                warn=True, hide=True)
+
         log.debug(f"{result}")
         return result.ok
 
     def check_exist_dir(self, path: Path | str) -> bool:
         path = self.resolve_path(path)
 
-        result = self.run(rf'test -d "{path}"', warn=True, hide=True)
+        if self.system.linux:
+            result = self.run(rf'test -d "{path}"', warn=True, hide=True)
+        else:
+            result = self.run(
+                f"powershell -Command \"Test-Path '{path}' -PathType Container\"",
+                warn=True, hide=True)
+
         log.debug(f"{result}")
         return result.ok
 
@@ -83,23 +126,33 @@ class SSH:
             raise PermissionError(result.stderr)
         return result
 
-    def makedir(self, path: Path | str, exist_ok: bool = True, parents: bool = True) -> bool:
+    # def makedir(self, path: Path | str, exist_ok: bool = True, parents: bool = True) -> bool:
+    #     path = self.resolve_path(path)
+    #
+    #     result = self.run(rf'mkdir "{path!s}"', warn=True, hide=True)
+    #
+    #     if not result.ok:
+    #         if self.check_exist_dir(Path(path).parent):
+    #             if exist_ok:
+    #                 return True
+    #             else:
+    #                 raise SystemError(f"Directory {path!s} already exists.")
+    #         else:
+    #             if parents:
+    #                 result = self.run(rf'mkdir -p "{path!s}"', warn=True, hide=True)
+    #                 return result.ok
+    #             else:
+    #                 raise SystemError(f"Parents {path!s} does not exist.")
+    #
+    #     return result.ok
+
+    def makedir(self, path: Path | str) -> bool:
         path = self.resolve_path(path)
 
-        result = self.run(rf'mkdir "{path!s}"', warn=True, hide=True)
-
-        if not result.ok:
-            if self.check_exist_dir(Path(path).parent):
-                if exist_ok:
-                    return True
-                else:
-                    raise SystemError(f"Directory {path!s} already exists.")
-            else:
-                if parents:
-                    result = self.run(rf'mkdir -p "{path!s}"', warn=True, hide=True)
-                    return result.ok
-                else:
-                    raise SystemError(f"Parents {path!s} does not exist.")
+        if self.system == "linux":
+            result = self.run(rf'mkdir -p "{path!s}"', warn=True, hide=True)
+        else:
+            result = self.run(rf'mkdir "{path!s}"', warn=True, hide=True)
 
         return result.ok
 

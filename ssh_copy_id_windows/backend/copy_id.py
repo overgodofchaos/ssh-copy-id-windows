@@ -107,6 +107,8 @@ def copy_id(host: str, username: str | None, port: int | None, id_path: str | No
 
     new_keys = [key for key in new_keys if key not in exists_keys]
 
+    log.debug(f"New keys will be added: {len(new_keys)}")
+
     new_authorized_keys = "\n".join([*exists_keys, *new_keys])
     log.debug(f"{new_authorized_keys}")
 

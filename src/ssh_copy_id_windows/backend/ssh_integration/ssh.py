@@ -58,14 +58,13 @@ class SSH:
         if path.startswith(("~/", "~\\")):
             path = self.home + path[1:]
 
-        return path.replace("$HOME", self.home)
+        path = path.replace("$HOME", self.home)
+        return path if self.system.linux else path.replace("/", "\\")
 
 
-    def connect(self, password: str | None = None, config: fabric.Config | None = None) -> fabric.Connection:
-        con = None
-
+    def connect(self) -> fabric.Connection:
         try:
-            con = fabric.Connection(host=self.hostname, port=self.port, user=self.username, config=config)
+            con = fabric.Connection(host=self.hostname, port=self.port, user=self.username)
 
             con.run("whoami", hide=True)
             log.debug(f"Successfully connected with key file.")
@@ -74,35 +73,32 @@ class SSH:
         except Exception as e:
             log.exception(f"Error connecting. Error: {e}")  # noqa: TRY401
         else:
-            pass
+            return con
 
-        if not con:
-            for _ in range(3 if password is None else 1):
-                password = getpass(prompt="Enter password: ") if password is None else password
-                try:
-                    con = fabric.Connection(host=self.hostname, port=self.port, user=self.username,
-                                            connect_kwargs={"password": password}, config=config)
-                    con.run("whoami", hide=True)
-                    break
-                except paramiko.ssh_exception.AuthenticationException:
-                    print(f"Incorrect password.")
-                    password = None
-                except Exception as e:
-                    print(f"Connection error: {e}")
-                    raise
+        for _ in range(3):
+            password = getpass(prompt="Enter password: ")
+            try:
+                con = fabric.Connection(host=self.hostname, port=self.port, user=self.username,
+                                        connect_kwargs={"password": password})
+                con.run("whoami", hide=True)
+            except paramiko.ssh_exception.AuthenticationException:
+                print(f"Incorrect password.")
+            except Exception as e:
+                print(f"Connection error: {e}")
+                raise
+            else:
+                return con
 
-        if not con:
-            raise Exception("Connection error")  # noqa: TRY002, TRY003
+        raise Exception("Connection error")  # noqa: TRY002, TRY003
 
-        if  self.system.windows and config is None:
-            log.debug("Switching to PowerShell")
-            con = self.connect(
-                password=password,
-                config=fabric.Config(overrides={'run': {'shell': 'powershell.exe'}}),
-            )
-            con.run("$PSVersionTable.PSEdition", hide=True)
+        # if  self.system.windows and config is None:
+        #     log.debug("Switching to PowerShell")
+        #     con = self.connect(
+        #         password=password,
+        #         config=fabric.Config(overrides={'run': {'shell': 'powershell.exe'}}),
+        #     )
+        #     con.run("$PSVersionTable.PSEdition", hide=True)
 
-        return con
 
     def check_exist_file(self, path: Path | str) -> bool:
         path = self.resolve_path(path)

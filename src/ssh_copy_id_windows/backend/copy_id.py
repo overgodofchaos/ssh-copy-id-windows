@@ -7,6 +7,11 @@ from .ssh_integration import SSH
 
 log = logger.bind(name="copy_id")
 
+def _list_to_pretty(lst: list) -> str:
+    result = ""
+    for i, item in enumerate(lst):
+        result += f"{i+1}. {item}\n"
+    return result
 
 def _resolve_path(path: Path | str) -> Path:
     log.debug(f"{path}")
@@ -80,15 +85,14 @@ def copy_id(host: str, username: str | None, port: int | None, id_path: str | No
             data = f.read()
         new_keys.append(data.strip("\n"))
 
-    log.debug(f"{new_keys}")
+    log.debug(f"New keys:\n{_list_to_pretty(new_keys)}")
 
     if not ssh.check_exist_dir("~/.ssh"):
         log.debug("Dir .ssh doesn't exist")
-        if os.environ.get("DRY_RUN"):
+        if os.environ.get("SSH_COPY_ID__DRY_RUN"):
             return
 
-
-        ssh.run(f"mkdir {ssh.resolve_path('~/.ssh')}")
+        ssh.run(f'mkdir "{ssh.resolve_path('~/.ssh')}"')
 
     if ssh.check_exist_file("~/.ssh/authorized_keys"):
         with ssh.sftp.open(f"{ssh.home}/.ssh/authorized_keys", "r") as f:
@@ -97,7 +101,7 @@ def copy_id(host: str, username: str | None, port: int | None, id_path: str | No
         authorized_keys = ""
 
     exists_keys = [key for key in authorized_keys.split("\n") if len(key) > 0]
-    log.debug(f"{exists_keys}")
+    log.debug(f"Exist keys:\n{_list_to_pretty(exists_keys)}")
 
     if len(exists_keys) == 0:
         log.debug("Exists keys not found")
@@ -107,9 +111,9 @@ def copy_id(host: str, username: str | None, port: int | None, id_path: str | No
     log.debug(f"New keys will be added: {len(new_keys)}")
 
     new_authorized_keys = "\n".join([*exists_keys, *new_keys])
-    log.debug(f"{new_authorized_keys}")
+    log.debug(f"Result keys:\n{_list_to_pretty([*exists_keys, *new_keys])}")
 
-    if os.environ.get("SSH-COPY-ID/DRY_RUN"):
+    if os.environ.get("SSH_COPY_ID__DRY_RUN"):
         return
 
     with ssh.sftp.open(f"{ssh.home}/.ssh/authorized_keys", "w") as f:

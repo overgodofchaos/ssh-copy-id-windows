@@ -10,7 +10,7 @@ app = typer.Typer(
     no_args_is_help=True,
     add_completion=False,
     rich_markup_mode=None,
-    pretty_exceptions_enable=False
+    pretty_exceptions_enable=False,
 )
 
 
@@ -32,6 +32,6 @@ def copy_id_cli(
 
 
 def main() -> None:
-    if os.environ.get("SSH-COPY-ID/DEBUG") != "true":
+    if os.environ.get("SSH-COPY-ID__DEBUG") != "true":
         logger.disable("")
     app()

@@ -1,4 +1,4 @@
-from ssh_copy_id_windows import main
+from src import ssh_copy_id_windows
 
 if __name__ == '__main__':
-    main.main()
+    ssh_copy_id_windows.main()

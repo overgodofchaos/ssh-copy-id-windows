@@ -36,62 +36,73 @@ class SSH:
         if unix_test.ok:
             if "linux" in unix_test.stdout.lower():
                 return System(linux=True)
-            else:
-                raise RuntimeError(f"Unsupported system: {unix_test.stdout}")
-        else:
-            windows_test = self.run("ver", hide=True, warn=True)
-            if windows_test.ok:
-                if "windows" in windows_test.stdout.lower():
-                    return System(windows=True)
-                else:
-                    raise RuntimeError(f"Unsupported system: {windows_test.stdout}")
-            else:
-                raise RuntimeError(f"Unknown system.")
+            raise RuntimeError(f"Unsupported system: {unix_test.stdout}")  # noqa: TRY003
+
+        windows_test = self.run("ver", hide=True, warn=True)
+        if windows_test.ok:
+            if "windows" in windows_test.stdout.lower():
+                return System(windows=True)
+            raise RuntimeError(f"Unsupported system: {windows_test.stdout}")  # noqa: TRY003
+
+        raise RuntimeError(f"Unknown system.")  # noqa: TRY003
 
     @cached_property
     def home(self) -> str:
         if self.system.linux:
             return self.run("echo $HOME", hide=True).stdout.strip()
-        else:
-            return self.run(f"powershell -Command \"echo $HOME\"").stdout.strip()
+        return self.run(f"powershell -Command \"echo $HOME\"").stdout.strip()
 
     def resolve_path(self, path: str | Path) -> str:
         path = str(path)
 
-        if path.startswith("~/") or path.startswith("~\\"):
+        if path.startswith(("~/", "~\\")):
             path = self.home + path[1:]
 
-        path = path.replace("$HOME", self.home)
+        return path.replace("$HOME", self.home)
 
-        return path
 
-    def connect(self) -> fabric.Connection:
+    def connect(self, password: str | None = None, config: fabric.Config | None = None) -> fabric.Connection:
+        con = None
+
         try:
-            con = fabric.Connection(host=self.hostname, port=self.port, user=self.username)
+            con = fabric.Connection(host=self.hostname, port=self.port, user=self.username, config=config)
 
             con.run("whoami", hide=True)
             log.debug(f"Successfully connected with key file.")
-            return con
         except paramiko.ssh_exception.AuthenticationException:
             log.debug(f"Failed autentification with key file.")
         except Exception as e:
-            log.exception(f"Error connecting. Error: {e}")
+            log.exception(f"Error connecting. Error: {e}")  # noqa: TRY401
+        else:
+            pass
 
+        if not con:
+            for _ in range(3 if password is None else 1):
+                password = getpass(prompt="Enter password: ") if password is None else password
+                try:
+                    con = fabric.Connection(host=self.hostname, port=self.port, user=self.username,
+                                            connect_kwargs={"password": password}, config=config)
+                    con.run("whoami", hide=True)
+                    break
+                except paramiko.ssh_exception.AuthenticationException:
+                    print(f"Incorrect password.")
+                    password = None
+                except Exception as e:
+                    print(f"Connection error: {e}")
+                    raise
 
-        for _ in range(3):
-            password = getpass(prompt="Enter password: ")
-            try:
-                con = fabric.Connection(host=self.hostname, port=self.port, user=self.username,
-                                        connect_kwargs={"password": password})
-                con.run("whoami", hide=True)
-                return con
-            except paramiko.ssh_exception.AuthenticationException:
-                print(f"Incorrect password.")
-            except Exception as e:
-                print(f"Connection error: {e}")
-                raise e
+        if not con:
+            raise Exception("Connection error")  # noqa: TRY002, TRY003
 
-        raise Exception("Connection error")
+        if  self.system.windows and config is None:
+            log.debug("Switching to PowerShell")
+            con = self.connect(
+                password=password,
+                config=fabric.Config(overrides={'run': {'shell': 'powershell.exe'}}),
+            )
+            con.run("$PSVersionTable.PSEdition", hide=True)
+
+        return con
 
     def check_exist_file(self, path: Path | str) -> bool:
         path = self.resolve_path(path)
@@ -103,7 +114,10 @@ class SSH:
                 f"powershell -Command \"Test-Path '{path}' -PathType Leaf\"",
                 warn=True, hide=True)
 
-        log.debug(f"{result}")
+        log.debug(f"{path}\n{result}")
+        if self.system.windows and result.stdout.lower().strip() == "false":
+            log.debug(f"Windows: {path} doesn't exist")
+            return False
         return result.ok
 
     def check_exist_dir(self, path: Path | str) -> bool:
@@ -116,7 +130,11 @@ class SSH:
                 f"powershell -Command \"Test-Path '{path}' -PathType Container\"",
                 warn=True, hide=True)
 
-        log.debug(f"{result}")
+        log.debug(f"{path}\n{result}")
+
+        if self.system.windows and result.stdout.lower().strip() == "false":
+            log.debug(f"Windows: {path} doesn't exist")
+            return False
         return result.ok
 
     @wraps(fabric.Connection.run)

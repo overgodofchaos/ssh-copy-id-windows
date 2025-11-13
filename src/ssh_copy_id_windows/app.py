@@ -32,6 +32,6 @@ def copy_id_cli(
 
 
 def main() -> None:
-    if os.environ.get("SSH-COPY-ID__DEBUG") != "true":
+    if os.environ.get("SSH_COPY_ID__DEBUG") != "true":
         logger.disable("")
     app()

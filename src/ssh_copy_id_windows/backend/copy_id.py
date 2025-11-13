@@ -12,12 +12,12 @@ def _resolve_path(path: Path | str) -> Path:
     log.debug(f"{path}")
     path = str(path)
 
-    if path.startswith("~/") or path.startswith("~\\"):
+    if path.startswith(("~/", "~\\")):
         path = str(Path.home().absolute() / path[1:].lstrip("/").lstrip("\\"))
         log.debug(f"{path}")
 
     if "/" not in path and "\\" not in path:
-        path = path = str(Path.home().absolute() / ".ssh" / path)
+        path = str(Path.home().absolute() / ".ssh" / path)
         log.debug(f"{path}")
 
     path = Path(path).absolute()
@@ -42,8 +42,7 @@ def _find_id(path: Path) -> Path:
 
         raise FileNotFoundError(path)
 
-    else:
-        raise FileNotFoundError(f"Path {path} is not file")
+    raise FileNotFoundError(f"Path {path} is not file")  # noqa: TRY003
 
 
 def _find_public_keys() -> list[Path]:
@@ -72,10 +71,7 @@ def copy_id(host: str, username: str | None, port: int | None, id_path: str | No
     log.debug(f"copy_id")
     ssh = SSH(hostname=host, username=username, port=port)
 
-    if not id_path:
-        key_files = _find_public_keys()
-    else:
-        key_files = [_find_id(_resolve_path(id_path))]
+    key_files = _find_public_keys() if not id_path else [_find_id(_resolve_path(id_path))]
 
     new_keys = []
     for key_file in key_files:
@@ -91,7 +87,8 @@ def copy_id(host: str, username: str | None, port: int | None, id_path: str | No
         if os.environ.get("DRY_RUN"):
             return
 
-        ssh.run("mkdir ~/.ssh")
+
+        ssh.run(f"mkdir {ssh.resolve_path('~/.ssh')}")
 
     if ssh.check_exist_file("~/.ssh/authorized_keys"):
         with ssh.sftp.open(f"{ssh.home}/.ssh/authorized_keys", "r") as f:

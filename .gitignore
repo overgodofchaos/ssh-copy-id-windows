@@ -61,3 +61,10 @@ __pypackages__/
 
 # Exclude
 !**/.gitkeep
+
+# Special
+executable/ssh-copy-id-windows.zip
+executable/ssh-copy-id-windows/bin/ssh-copy-id.exe
+ssh-copy-id.dist
+ssh-copy-id.build
+ssh-copy-id.onefile-build
